@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Huella 3D</title>
+<meta name="description" content="Convertí el GPX de una caminata en un video 3D del recorrido, con distancia y perfil de altura.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <h1>Huella 3D</h1>
+  </div>
+  <p class="lede">Subí el GPX de la caminata y descargá un video 3D del recorrido, con distancia y perfil de altura.</p>
+</header>
+
+<main class="layout">
+  <section class="panel" aria-label="Opciones">
+    <fieldset class="step">
+      <legend><span class="step-n">1</span> Recorrido</legend>
+      <label class="drop" id="drop" for="gpx">
+        <input type="file" id="gpx" accept=".gpx,application/gpx+xml,application/xml,text/xml">
+        <strong>Elegí el archivo GPX</strong>
+        <span>o arrastralo acá. Lo exportás desde Wikiloc, Strava, Garmin, etc.</span>
+      </label>
+      <button type="button" class="link" id="sample">Usar recorrido de ejemplo</button>
+      <dl class="facts" id="facts" hidden>
+        <div><dt>Distancia</dt><dd id="f-dist">–</dd></div>
+        <div><dt>Desnivel +</dt><dd id="f-up">–</dd></div>
+        <div><dt>Altura máx.</dt><dd id="f-max">–</dd></div>
+        <div><dt>Duración</dt><dd id="f-time">–</dd></div>
+      </dl>
+    </fieldset>
+
+    <fieldset class="step">
+      <legend><span class="step-n">2</span> Textos</legend>
+      <label class="field">Título
+        <input type="text" id="title" maxlength="40" placeholder="Bardas del río">
+      </label>
+      <label class="field">Subtítulo
+        <input type="text" id="subtitle" maxlength="60" placeholder="Grupo de trekking · 10 de octubre de 2025">
+      </label>
+    </fieldset>
+
+    <fieldset class="step">
+      <legend><span class="step-n">3</span> Video</legend>
+      <div class="row">
+        <label class="field">Duración
+          <select id="duration">
+            <option value="30">30 s</option>
+            <option value="45" selected>45 s</option>
+            <option value="60">60 s</option>
+            <option value="90">90 s</option>
+          </select>
+        </label>
+        <label class="field">Calidad
+          <select id="quality">
+            <option value="720" selected>HD 720p</option>
+            <option value="1080">Full HD 1080p</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">Relieve <output id="exag-out" for="exag">×1,5</output>
+        <input type="range" id="exag" min="1" max="2.5" step="0.1" value="1.5">
+      </label>
+      <div class="field">Color de la traza
+        <div class="swatches" id="swatches" role="radiogroup" aria-label="Color de la traza">
+          <button type="button" role="radio" aria-checked="true" data-color="#ffd23f" style="--sw:#ffd23f" title="Amarillo"></button>
+          <button type="button" role="radio" aria-checked="false" data-color="#ff7a1a" style="--sw:#ff7a1a" title="Naranja"></button>
+          <button type="button" role="radio" aria-checked="false" data-color="#ff3d6e" style="--sw:#ff3d6e" title="Fucsia"></button>
+          <button type="button" role="radio" aria-checked="false" data-color="#3fd8ff" style="--sw:#3fd8ff" title="Celeste"></button>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="actions">
+      <button type="button" class="btn ghost" id="preview" disabled>Vista previa</button>
+      <button type="button" class="btn primary" id="render" disabled>Generar video</button>
+    </div>
+
+    <div class="progress" id="progress" hidden>
+      <div class="bar"><span id="bar"></span></div>
+      <div class="progress-row">
+        <span id="status">Preparando…</span>
+        <button type="button" class="link" id="cancel">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="result" id="result" hidden>
+      <video id="video" controls playsinline></video>
+      <div class="actions">
+        <a class="btn primary" id="download" download="recorrido.mp4" href="#">Descargar MP4</a>
+        <button type="button" class="btn ghost" id="share" hidden>Compartir</button>
+      </div>
+      <p class="note" id="result-note"></p>
+    </div>
+
+    <p class="msg" id="msg" role="status"></p>
+  </section>
+
+  <section class="stage" aria-label="Vista del video">
+    <div class="frame" id="frame">
+      <div class="viewport" id="viewport">
+        <div id="map"></div>
+        <canvas id="overlay"></canvas>
+      </div>
+      <div class="empty" id="empty">
+        <p>Cargá un GPX para ver el recorrido.</p>
+      </div>
+    </div>
+    <p class="credits">Imágenes satelitales © Esri, Maxar, Earthstar Geographics · Relieve © Mapzen / AWS Terrain Tiles · El GPX no sale de tu dispositivo.</p>
+  </section>
+</main>
+
+<script src="vendor/maplibre-gl.js"></script>
+<script src="vendor/mp4-muxer.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
