@@ -69,6 +69,18 @@
         <ul class="thumbs" id="thumbs"></ul>
         <p class="note" id="photos-note"></p>
       </div>
+      <div class="field">Música de fondo
+        <div class="filerow">
+          <label class="btn ghost small" for="music">Elegir música</label>
+          <input type="file" id="music" class="visually-hidden" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg">
+          <span class="music-name" id="music-name"></span>
+          <button type="button" class="link" id="music-del" hidden>Quitar</button>
+        </div>
+        <label class="inline" id="music-start-row" hidden>Empezar desde el segundo
+          <input type="number" id="music-start" min="0" step="1" value="0">
+        </label>
+        <span class="hint">MP3 o M4A. Se ajusta sola a la duración del video, con fundido al final. Música con derechos de autor puede ser silenciada en Instagram o Facebook.</span>
+      </div>
     </fieldset>
 
     <fieldset class="step">

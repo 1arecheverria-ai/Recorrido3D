@@ -18,6 +18,7 @@
     status: $('status'), cancel: $('cancel'), result: $('result'), video: $('video'),
     download: $('download'), share: $('share'), resultNote: $('result-note'), msg: $('msg'),
     logo: $('logo'), logoPrev: $('logo-prev'), logoDel: $('logo-del'),
+    music: $('music'), musicName: $('music-name'), musicDel: $('music-del'), musicStart: $('music-start'), musicStartRow: $('music-start-row'),
     photos: $('photos'), photosDel: $('photos-del'), thumbs: $('thumbs'), photosNote: $('photos-note'),
     frame: $('frame'), viewport: $('viewport'), overlay: $('overlay'), empty: $('empty'),
   };
@@ -36,6 +37,8 @@
     logo: null,           // ImageBitmap
     photos: [],           // {name, bmp, thumb, lat, lon, time}
     placed: [],           // fotos ubicadas en el recorrido, ordenadas por d
+    music: null,          // AudioBuffer
+    previewAudio: null,
   };
 
   /* ---------- utilidades geográficas ---------- */
@@ -734,15 +737,90 @@
     if (S.track && !S.previewRaf && !S.busy) applyFrame(0.9, timeline(+ui.duration.value));
   }
 
+  /* ---------- música ---------- */
+  const SR = 48000;
+  let actx = null;
+  const audioCtx = () => (actx || (actx = new (window.AudioContext || window.webkitAudioContext)()));
+  async function setMusic(file) {
+    setMsg('Leyendo la música…');
+    try {
+      const buf = await audioCtx().decodeAudioData(await file.arrayBuffer());
+      S.music = buf;
+      ui.musicName.textContent = `${file.name} · ${fmtSec(buf.duration)}`;
+      ui.musicDel.hidden = false; ui.musicStartRow.hidden = false;
+      ui.musicStart.max = Math.max(0, Math.floor(buf.duration) - 5);
+      setMsg('');
+    } catch { setMsg('No se pudo leer ese archivo de audio. Probá con un MP3.', true); }
+  }
+  function clearMusic() {
+    S.music = null; ui.music.value = ''; ui.musicName.textContent = '';
+    ui.musicDel.hidden = true; ui.musicStartRow.hidden = true; ui.musicStart.value = 0;
+  }
+  function fmtSec(x) { const m = Math.floor(x / 60), s2 = Math.round(x % 60); return `${m}:${String(s2).padStart(2, '0')}`; }
+  /* Mezcla la música a la duración exacta del video: repite si es corta, fundido de entrada y salida. */
+  async function mixMusic(T) {
+    const n = Math.ceil(T * SR);
+    const off = new OfflineAudioContext(2, n, SR);
+    const src = off.createBufferSource();
+    src.buffer = S.music; src.loop = true;
+    const start = clamp(+ui.musicStart.value || 0, 0, Math.max(0, S.music.duration - 1));
+    src.loopStart = 0; src.loopEnd = S.music.duration;
+    const g = off.createGain();
+    g.gain.setValueAtTime(0, 0);
+    g.gain.linearRampToValueAtTime(0.9, 0.6);
+    g.gain.setValueAtTime(0.9, Math.max(0.7, T - 3.5));
+    g.gain.linearRampToValueAtTime(0, T);
+    src.connect(g).connect(off.destination);
+    src.start(0, start);
+    return off.startRendering();
+  }
+  async function pickAudioCodec() {
+    if (!('AudioEncoder' in window)) return null;
+    for (const c of [{ codec: 'mp4a.40.2', mux: 'aac' }, { codec: 'opus', mux: 'opus' }]) {
+      const cfg = { codec: c.codec, sampleRate: SR, numberOfChannels: 2, bitrate: 192000 };
+      try { if ((await AudioEncoder.isConfigSupported(cfg)).supported) return { cfg, mux: c.mux }; } catch { /* sigue */ }
+    }
+    return null;
+  }
+  async function encodeAudio(buf, codec, muxer) {
+    let err = null;
+    const enc = new AudioEncoder({ output: (ch, meta) => muxer.addAudioChunk(ch, meta), error: (e) => { err = e; } });
+    enc.configure(codec.cfg);
+    const L = buf.getChannelData(0), Rr = buf.getChannelData(1), F = 4096;
+    for (let i = 0; i < buf.length; i += F) {
+      const len = Math.min(F, buf.length - i), data = new Float32Array(len * 2);
+      data.set(L.subarray(i, i + len), 0); data.set(Rr.subarray(i, i + len), len);
+      const ad = new AudioData({ format: 'f32-planar', sampleRate: SR, numberOfFrames: len, numberOfChannels: 2, timestamp: Math.round(i / SR * 1e6), data });
+      enc.encode(ad); ad.close();
+      if (err) throw err;
+    }
+    await enc.flush(); enc.close();
+    if (err) throw err;
+  }
+  function startPreviewAudio() {
+    if (!S.music) return;
+    const c = audioCtx(); c.resume();
+    const src = c.createBufferSource(); src.buffer = S.music; src.loop = true;
+    const g = c.createGain(); g.gain.value = 0.9;
+    src.connect(g).connect(c.destination);
+    src.start(0, clamp(+ui.musicStart.value || 0, 0, Math.max(0, S.music.duration - 1)));
+    S.previewAudio = src;
+  }
+  function stopPreviewAudio() {
+    if (S.previewAudio) { try { S.previewAudio.stop(); } catch { /* ya detenido */ } S.previewAudio = null; }
+  }
+
   /* ---------- vista previa ---------- */
   function stopPreview() {
     cancelAnimationFrame(S.previewRaf); S.previewRaf = 0;
+    stopPreviewAudio();
     ui.preview.textContent = 'Vista previa';
   }
   function togglePreview() {
     if (S.previewRaf) { stopPreview(); return; }
     const tl = timeline(+ui.duration.value), t0 = performance.now();
     ui.preview.textContent = 'Detener';
+    startPreviewAudio();
     const loop = (now) => {
       const t = (now - t0) / 1000;
       if (t > tl.T) { stopPreview(); return; }
@@ -801,9 +879,15 @@
     const octx = out.getContext('2d');
     const mapCanvas = map.getCanvas();
 
+    let aCodec = null, audioNote = '';
+    if (S.music) {
+      aCodec = await pickAudioCodec();
+      if (!aCodec) audioNote = 'Este navegador no puede agregar la música: el video sale sin sonido. Usá Chrome o Edge en la PC.';
+    }
     const muxer = new Mp4Muxer.Muxer({
       target: new Mp4Muxer.ArrayBufferTarget(),
       video: { codec: codec.mux, width: W, height: H, frameRate: FPS },
+      ...(aCodec ? { audio: { codec: aCodec.mux, numberOfChannels: 2, sampleRate: SR } } : {}),
       fastStart: 'in-memory',
     });
     let encErr = null;
@@ -816,6 +900,10 @@
     const started = performance.now();
     try {
       await document.fonts.ready;
+      if (aCodec) {
+        ui.status.textContent = 'Preparando la música…';
+        await encodeAudio(await mixMusic(N / FPS), aCodec, muxer);
+      }
       for (let f = 0; f < N; f++) {
         if (S.cancel) throw new Error('cancelado');
         if (encErr) throw encErr;
@@ -835,7 +923,7 @@
       await enc.flush();
       muxer.finalize();
       const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
-      showResult(blob, codec.mux);
+      showResult(blob, codec.mux, audioNote || (aCodec && aCodec.mux === 'opus' ? 'La música quedó en formato Opus: algunos celulares podrían no reproducir el sonido.' : ''));
     } catch (e) {
       if (e.message === 'cancelado') setMsg('Generación cancelada.');
       else { console.error(e); setMsg('No se pudo generar el video: ' + (e.message || e), true); }
@@ -851,14 +939,15 @@
     return (base || 'recorrido') + '.mp4';
   }
 
-  function showResult(blob, mux) {
+  function showResult(blob, mux, extra) {
     if (S.videoUrl) URL.revokeObjectURL(S.videoUrl);
     S.videoUrl = URL.createObjectURL(blob); S.videoBlob = blob;
     ui.video.src = S.videoUrl;
     ui.download.href = S.videoUrl; ui.download.download = fileName();
     const mb = (blob.size / 1048576).toFixed(1).replace('.', ',');
     ui.resultNote.textContent = `${ui.download.download} · ${mb} MB` +
-      (mux === 'vp9' ? ' · Formato VP9: algunos celulares no lo reproducen; si pasa, generalo desde Chrome en una PC.' : '');
+      (mux === 'vp9' ? ' · Formato VP9: algunos celulares no lo reproducen; si pasa, generalo desde Chrome en una PC.' : '') +
+      (extra ? ' · ' + extra : '');
     const file = new File([blob], ui.download.download, { type: 'video/mp4' });
     ui.share.hidden = !(navigator.canShare && navigator.canShare({ files: [file] }));
     ui.result.hidden = false;
@@ -870,7 +959,7 @@
     const has = !!S.track;
     ui.render.disabled = lock || !has;
     ui.preview.disabled = lock || !has;
-    [ui.gpx, ui.sample, ui.duration, ui.quality, ui.exag, ui.logo, ui.photos].forEach((el) => { el.disabled = lock && S.busy; });
+    [ui.gpx, ui.sample, ui.duration, ui.quality, ui.exag, ui.logo, ui.photos, ui.music, ui.musicStart].forEach((el) => { el.disabled = lock && S.busy; });
   }
 
   ui.gpx.addEventListener('change', () => onFile(ui.gpx.files[0]));
@@ -915,6 +1004,8 @@
 
   ui.logo.addEventListener('change', () => { if (ui.logo.files[0]) setLogo(ui.logo.files[0], true); });
   ui.logoDel.addEventListener('click', clearLogo);
+  ui.music.addEventListener('change', () => { if (ui.music.files[0]) setMusic(ui.music.files[0]); });
+  ui.musicDel.addEventListener('click', clearMusic);
   ui.photos.addEventListener('change', async () => { await addPhotos([...ui.photos.files]); ui.photos.value = ''; });
   ui.photosDel.addEventListener('click', () => {
     S.photos.forEach((ph) => { URL.revokeObjectURL(ph.url); if (ph.bmp) ph.bmp.close(); });
