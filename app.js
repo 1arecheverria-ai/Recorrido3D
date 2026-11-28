@@ -469,8 +469,9 @@
     }
 
     // Foto del recorrido (pausa)
+    let photoA = 0;
     if (sc.photo) {
-      const a = Math.min(smooth(clamp(sc.pk / 0.14, 0, 1)), smooth(clamp((1 - sc.pk) / 0.14, 0, 1)));
+      const a = photoA = Math.min(smooth(clamp(sc.pk / 0.14, 0, 1)), smooth(clamp((1 - sc.pk) / 0.14, 0, 1)));
       const img = sc.photo.bmp;
       c.save(); c.globalAlpha = a;
       c.fillStyle = 'rgba(0,0,0,0.45)'; c.fillRect(0, 0, W, H);
@@ -488,11 +489,11 @@
     }
 
     // Logo del grupo
-    if (S.logo) {
+    if (S.logo && photoA < 1) {
       const lg = S.logo, maxW = 228 * s, maxH = 86 * s;
       const r = Math.min(maxW / lg.width, maxH / lg.height);
       const lw = lg.width * r, lh = lg.height * r;
-      c.save(); c.globalAlpha = 0.95; c.shadowColor = 'rgba(0,0,0,0.45)'; c.shadowBlur = 8 * s;
+      c.save(); c.globalAlpha = 0.95 * (1 - photoA); c.shadowColor = 'rgba(0,0,0,0.45)'; c.shadowBlur = 8 * s;
       c.drawImage(lg, W - 32 * s - lw, 28 * s, lw, lh);
       c.restore();
     }
