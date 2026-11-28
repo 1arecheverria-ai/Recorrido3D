@@ -20,7 +20,7 @@ La generación se hace cuadro por cuadro y espera a que cargue cada parte del ma
 
 - Se ubican en el recorrido por el GPS de la foto (hasta 300 m de la traza) o, si no tiene GPS, por la hora de toma cruzada con las horas del GPX.
 - Las fotos sin GPS ni hora (por ejemplo, reenviadas por WhatsApp) se descartan.
-- En cada foto la cámara se detiene unos 3 s; el video se alarga si hace falta. Máximo 20 fotos.
+- En cada foto la cámara se detiene unos 4 s; el video se alarga si hace falta. Máximo 20 fotos.
 - Formato JPG. Las fotos HEIC del iPhone solo se abren en Safari; en Chrome conviene configurar el iPhone en *Ajustes → Cámara → Formatos → Más compatible*.
 
 ## Música

@@ -255,7 +255,7 @@
   setQuality(720);
 
   /* ---------- guion de cámara ---------- */
-  const PAUSE = 3.2; // segundos de pausa en cada foto
+  const PAUSE = 4.2; // segundos de pausa en cada foto
   const progress = (u) => 0.75 * u + 0.25 * smooth(u);
   function invProgress(f) {
     let lo = 0, hi = 1;
@@ -474,12 +474,12 @@
       const img = sc.photo.bmp;
       c.save(); c.globalAlpha = a;
       c.fillStyle = 'rgba(0,0,0,0.45)'; c.fillRect(0, 0, W, H);
-      const maxW = W * 0.78, maxH = H * 0.74;
+      const bd = 6 * s, m = 14 * s; // borde blanco y margen mínimo al borde del video
+      const maxW = W - 2 * (m + bd), maxH = H - 2 * (m + bd);
       const r = Math.min(maxW / img.width, maxH / img.height);
-      const zoom = 0.94 + 0.06 * smooth(clamp(sc.pk / 0.3, 0, 1)) + 0.02 * sc.pk;
+      const zoom = 0.94 + 0.06 * smooth(clamp(sc.pk / 0.2, 0, 1));
       const iw = img.width * r * zoom, ih = img.height * r * zoom;
-      const ix = (W - iw) / 2, iy = (H - ih) / 2 - 10 * s;
-      const bd = 8 * s;
+      const ix = (W - iw) / 2, iy = (H - ih) / 2;
       c.shadowColor = 'rgba(0,0,0,0.5)'; c.shadowBlur = 24 * s;
       c.fillStyle = '#fff'; c.fillRect(ix - bd, iy - bd, iw + bd * 2, ih + bd * 2);
       c.shadowBlur = 0;
@@ -489,7 +489,7 @@
 
     // Logo del grupo
     if (S.logo) {
-      const lg = S.logo, maxW = 190 * s, maxH = 72 * s;
+      const lg = S.logo, maxW = 228 * s, maxH = 86 * s;
       const r = Math.min(maxW / lg.width, maxH / lg.height);
       const lw = lg.width * r, lh = lg.height * r;
       c.save(); c.globalAlpha = 0.95; c.shadowColor = 'rgba(0,0,0,0.45)'; c.shadowBlur = 8 * s;
